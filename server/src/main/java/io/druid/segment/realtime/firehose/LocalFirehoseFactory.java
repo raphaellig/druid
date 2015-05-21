@@ -19,6 +19,7 @@ package io.druid.segment.realtime.firehose;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Charsets;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.metamx.common.ISE;
@@ -28,15 +29,16 @@ import io.druid.data.input.FirehoseFactory;
 import io.druid.data.input.impl.FileIteratingFirehose;
 import io.druid.data.input.impl.StringInputRowParser;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.LineIterator;
 import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.commons.io.filefilter.WildcardFileFilter;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.zip.GZIPInputStream;
 
 /**
  */
@@ -111,7 +113,19 @@ public class LocalFirehoseFactory implements FirehoseFactory<StringInputRowParse
           public LineIterator next()
           {
             try {
-              return FileUtils.lineIterator(files.poll());
+              File file = files.poll();
+              if (file.getName().endsWith(".gz")) {
+                return IOUtils.lineIterator(
+                        new BufferedReader(
+                                new InputStreamReader(
+                                        new GZIPInputStream(new FileInputStream(file)),
+                                        Charsets.UTF_8
+                                )
+                        )
+                );
+              } else {
+                return FileUtils.lineIterator(file);
+              }
             }
             catch (Exception e) {
               throw Throwables.propagate(e);
